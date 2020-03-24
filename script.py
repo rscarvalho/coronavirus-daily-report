@@ -8,7 +8,8 @@ import urllib.error
 import urllib.request
 from datetime import date, timedelta
 from io import StringIO
-from logging import StreamHandler
+from logging import StreamHandler, FileHandler
+import csv
 
 from pdfminer.converter import PDFPageAggregator
 from pdfminer.layout import LTChar, LTTextBox, LTTextLine
@@ -18,7 +19,7 @@ from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
 from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
 
-handler = StreamHandler(stream=sys.stderr)
+handler = FileHandler("script.log")
 logging.basicConfig(handlers=[handler], level=logging.DEBUG)
 
 cases_pattern = re.compile(
@@ -30,6 +31,7 @@ def download_files():
     end_date = date(2020, 3, 23)
 
     download_url = "https://www.mass.gov/doc/covid-19-cases-in-massachusetts-as-of-{}-{}/download"
+    # Let's impersonate a Chrome browser so the website doesn't block us
     user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.149 Safari/537.36"
 
     for i in range((end_date - start_date).days + 1):
@@ -46,32 +48,28 @@ def download_files():
             logging.info(f"File {output} already exists")
             continue
 
-        print(url)
+        logging.debug(url)
 
-        try:
-            headers = {
-                "User-agent": user_agent
-            }
-            req = urllib.request.Request(url=url, headers=headers)
-            with urllib.request.urlopen(req) as response, open(output, 'wb') as w:
-                shutil.copyfileobj(response, w)
-                logging.info(f"Downloaded file {output}")
-        except urllib.error.HTTPError as e:
-            print(type(e), e.read())
-            raise e
+        headers = {
+            "User-agent": user_agent
+        }
+        req = urllib.request.Request(url=url, headers=headers)
+        with urllib.request.urlopen(req) as response, open(output, 'wb') as w:
+            shutil.copyfileobj(response, w)
+            logging.info(f"Downloaded file {output}")
 
 
 def run_analisys():
-    for f in os.listdir("downloads"):
-        try:
-            file_path = path.join("downloads", f)
-            processing_date = f.replace(".pdf", "")
-            with open(file_path, 'rb') as fp:
-                logging.info(f"processing file={file_path}")
-                stats = process_document(fp)
-            print(f"{processing_date},{stats['cases']},{stats['deaths']}")
-        except:
+    out_writer = csv.writer(sys.stdout)
+    for f in sorted(os.listdir("downloads")):
+        if not f.endswith(".pdf"):
             continue
+        file_path = path.join("downloads", f)
+        processing_date = f.replace(".pdf", "")
+        with open(file_path, 'rb') as fp:
+            logging.info(f"processing file={file_path}")
+            stats = process_document(fp)
+        out_writer.writerow([processing_date, stats['cases'], stats['deaths']])
 
 
 def process_document(fp):
