@@ -8,6 +8,10 @@ autopep8 = "*"
 
 [packages]
 pdfminer = "*"
+jupyter = "*"
+matplotlib = "*"
+pandas = "*"
+numpy = "*"
 
 [requires]
 python_version = "3.6"
