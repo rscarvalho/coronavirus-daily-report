@@ -32,7 +32,7 @@ cases_pattern = re.compile(
 
 def download_files():
     start_date = date(2020, 3, 20)
-    end_date = date(2020, 4, 5)
+    end_date = date.today()
 
     download_url = "https://www.mass.gov/doc/covid-19-cases-in-massachusetts-as-of-{}-{}/download"
     # Let's impersonate a Chrome browser so the website doesn't block us
@@ -62,9 +62,9 @@ def download_files():
             with urllib.request.urlopen(req) as response, open(output, 'wb') as w:
                 shutil.copyfileobj(response, w)
                 logging.info(f"Downloaded file {output}")
-        except urllib.error.HTTPError as e:
+        except Exception as e:
             print("Error downloading file for {} at {}".format(current.strftime("%Y-%m-%d"), url), file=sys.stderr)
-            raise e
+            logging.error("Error downloading file {}".format(url), e)
 
 
 def run_analisys():
