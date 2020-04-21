@@ -8,7 +8,7 @@ import shutil
 import sys
 import urllib.error
 import urllib.request
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from io import StringIO
 from logging import StreamHandler, FileHandler
 import csv
@@ -21,18 +21,17 @@ from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
 from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
 
+from parser.massachusetts import MassachusettsParser1, MassachusettsParser2
+from parser.base import ParsedRecord
+
 handler = FileHandler("script.log")
 logging.basicConfig(handlers=[handler], level=logging.DEBUG)
 
-patterns = [
-    ("cases", r"Cases Reported\s*?=\s*(?P<cases>[\d,]+)"),
-    ("deaths", r"Deaths.+?Attributed to COVID-19\s+(?P<deaths>[\d,]+)"),
-    ("test_positive", r"Total (?:Patients Tested|Tested\* Patients).*?(?P<test_positive>[\d,]+?)\s"),
-    ("test_total", r"Total (?:Patients Tested\*|Tested\* Patients).*?(?:[\d,]+?)\s+(?P<test_total>[\d,]+)"),
-]
 
+ALL_PARSERS = (MassachusettsParser1(), MassachusettsParser2())
 
 def download_files():
+    state = 'ma'
     start_date = date(2020, 3, 20)
     end_date = date.today()
 
@@ -42,11 +41,14 @@ def download_files():
 
     for i in range((end_date - start_date).days + 1):
         current = start_date + timedelta(days=i)
+        parsers = [p for p in ALL_PARSERS if p.can_parse(state, current)]
 
-        url = download_url.format(
-            current.strftime("%B").lower(),
-            current.strftime("%-d-%Y")
-        )
+        if not parsers:
+            logging.error(f"Cannot find a parser for state={state}, date={current}")
+            continue
+        parser = parsers[0]
+
+        url = parser.get_url(current)
 
         output = path.join("downloads", f"{current.strftime('%Y-%m-%d')}.pdf")
 
@@ -70,25 +72,27 @@ def download_files():
 
 
 def run_analisys():
+    state = 'ma'
     out_writer = csv.writer(sys.stdout)
-    columns = ("cases", "deaths", "test_positive", "test_total")
-    out_writer.writerow(["date"] + list(columns))
+    out_writer.writerow(["date"] + ParsedRecord.header())
+
     for f in sorted(os.listdir("downloads")):
         if not f.endswith(".pdf"):
             continue
         file_path = path.join("downloads", f)
-        processing_date = f.replace(".pdf", "")
+        processing_date_str = f.replace(".pdf", "")
+        processing_date = datetime.strptime(processing_date_str, "%Y-%m-%d").date()
         with open(file_path, 'rb') as fp:
             logging.info(f"processing file={file_path}")
-            stats = process_document(fp, file_path.replace(".pdf", ".txt"))
-            logging.info(f"Stats for date={processing_date} - {stats}")
+            stats = process_document(state, processing_date, fp, file_path.replace(".pdf", ".txt"))
+            logging.info(f"Stats for date={processing_date_str} - {stats}")
         if stats:
-            out_writer.writerow([processing_date] + [stats[k] for k in columns])
+            out_writer.writerow([processing_date_str] + stats.row)
         else:
             logging.warn(f"could not find info for file={file_path}")
 
 
-def process_document(fp, out_file):
+def process_document(state, processing_date, fp, out_file):
     if path.exists(out_file):
         contents = open(out_file, "rb").read().decode("utf-8")
     else:
@@ -109,12 +113,12 @@ def process_document(fp, out_file):
                     contents += element.get_text()
         open(out_file, "wb").write(contents.encode("utf-8"))
 
-    matches = {}
-    for key, pattern in patterns:
-        match = re.search(pattern, contents, re.MULTILINE | re.IGNORECASE)
-        matches[key] = match.groups()[0].replace(",", "") if match else 0
+    parsers = [p for p in ALL_PARSERS if p.can_parse(state, processing_date)]
+    if not parsers:
+        return None
 
-    return matches
+    parser = parsers[0]
+    return parser.parse_document(contents)
 
 
 
