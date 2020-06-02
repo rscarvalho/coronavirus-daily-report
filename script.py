@@ -8,6 +8,7 @@ import shutil
 import sys
 import urllib.error
 import urllib.request
+from urllib.error import HTTPError
 from datetime import date, datetime, timedelta
 from io import StringIO
 from logging import StreamHandler, FileHandler
@@ -66,6 +67,8 @@ def download_files():
             with urllib.request.urlopen(req) as response, open(output, 'wb') as w:
                 shutil.copyfileobj(response, w)
                 logging.info(f"Downloaded file {output}")
+        except HTTPError as e:
+            print("[NOT FOUND] Could not download file for {} at {}".format(current.strftime("%Y-%m-%d"), url))
         except Exception as e:
             print("Error downloading file for {} at {}".format(current.strftime("%Y-%m-%d"), url), file=sys.stderr)
             logging.error("Error downloading file {}".format(url), e)
@@ -76,12 +79,23 @@ def run_analisys():
     out_writer = csv.writer(sys.stdout)
     out_writer.writerow(["date"] + ParsedRecord.header())
 
+    with open('stats.csv') as in_file:
+        processed_dates = {datetime.strptime(r["date"], "%Y-%m-%d").date(): r for r in csv.DictReader(in_file)}
+
     for f in sorted(os.listdir("downloads")):
         if not f.endswith(".pdf"):
             continue
         file_path = path.join("downloads", f)
         processing_date_str = f.replace(".pdf", "")
         processing_date = datetime.strptime(processing_date_str, "%Y-%m-%d").date()
+
+        if processing_date in processed_dates:
+            logging.info(f"Already processed for date={processing_date.isoformat()}")
+            r = processed_dates[processing_date]
+            record = ParsedRecord(r["cases"], r["deaths"], r["test_total"], r["test_positive"])
+            out_writer.writerow([r["date"]] + record.row)
+            continue
+
         with open(file_path, 'rb') as fp:
             logging.info(f"processing file={file_path}")
             stats = process_document(state, processing_date, fp, file_path.replace(".pdf", ".txt"))
