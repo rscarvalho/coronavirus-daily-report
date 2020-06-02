@@ -68,7 +68,8 @@ def download_files():
                 shutil.copyfileobj(response, w)
                 logging.info(f"Downloaded file {output}")
         except HTTPError as e:
-            print("[NOT FOUND] Could not download file for {} at {}".format(current.strftime("%Y-%m-%d"), url))
+            print("[NOT FOUND] Could not download file for {} at {}".format(current.strftime("%Y-%m-%d"), url),
+                    file=sys.stderr)
         except Exception as e:
             print("Error downloading file for {} at {}".format(current.strftime("%Y-%m-%d"), url), file=sys.stderr)
             logging.error("Error downloading file {}".format(url), e)
@@ -76,7 +77,7 @@ def download_files():
 
 def run_analisys():
     state = 'ma'
-    out_writer = csv.writer(sys.stdout)
+    out_writer = csv.writer(sys.stdout, lineterminator=os.linesep)
     out_writer.writerow(["date"] + ParsedRecord.header())
 
     with open('stats.csv') as in_file:
@@ -103,7 +104,7 @@ def run_analisys():
         if stats:
             out_writer.writerow([processing_date_str] + stats.row)
         else:
-            logging.warn(f"could not find info for file={file_path}")
+            logging.warning(f"could not find info for file={file_path}")
 
 
 def process_document(state, processing_date, fp, out_file):
