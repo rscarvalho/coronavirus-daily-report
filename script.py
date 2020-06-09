@@ -22,14 +22,14 @@ from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
 from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
 
-from parser.massachusetts import MassachusettsParser1, MassachusettsParser2
+from parser.massachusetts import MassachusettsParser1, MassachusettsParser2, MassachusettsParser3
 from parser.base import ParsedRecord
 
 handler = FileHandler("script.log")
 logging.basicConfig(handlers=[handler], level=logging.DEBUG)
 
 
-ALL_PARSERS = (MassachusettsParser1(), MassachusettsParser2())
+ALL_PARSERS = (MassachusettsParser1(), MassachusettsParser2(), MassachusettsParser3())
 
 def download_files():
     state = 'ma'
