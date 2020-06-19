@@ -46,12 +46,31 @@ class MassachusettsParser2(RegexParser):
 
 class MassachusettsParser3(RegexParser):
     start_date = date(2020, 6, 1)
+    end_date = date(2020, 6, 15)
 
     patterns = {
         "cases": r"Total[ ]?Cases\s*?([\d,]+)",
         "deaths": r"Total Deaths\s*?([\d,]+)",
         "test_positive": r"Total[ ]?Cases\s*?([\d,]+)",
         "test_total": r"Total Patients[ ]?Tested by[ ]?Molecular Tests\s*?([\d,]+)"
+    }
+
+    def get_url(self, partition):
+        month = partition.strftime("%B").lower()
+        datepart = partition.strftime("%-d-%Y")
+        return f"https://www.mass.gov/doc/covid-19-dashboard-{month}-{datepart}/download"
+
+    def can_parse(self, state, partition):
+        return state == 'ma' and partition >= self.start_date and partition < self.end_date
+
+class MassachusettsParser4(RegexParser):
+    start_date = date(2020, 6, 15)
+
+    patterns = {
+        "cases": r"Total[ ]?Cases\s*?([\d,]+)",
+        "deaths": r"Total Deaths\s*?([\d,]+)",
+        "test_positive": r"Total[ ]?Cases\s*?([\d,]+)",
+        "test_total": r"Total Individuals[ ]?Tested by[ ]?Molecular Tests([\d,]+)"
     }
 
     def get_url(self, partition):
